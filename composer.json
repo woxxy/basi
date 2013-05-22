@@ -1,0 +1,14 @@
+{
+    "name": "foolz/basi",
+    "description": "Codice di base per fillare il database del progetto di basi",
+    "authors": [
+        {
+            "name": "Woxxy",
+            "email": "support@foolz.us"
+        }
+    ],
+    "require": {
+	    "symfony/console": "2.2.*",
+	    "fzaninotto/faker": "1.1.x"
+    }
+}
