@@ -17,6 +17,16 @@ class Console extends Command
 	 */
 	protected $conn = null;
 
+	protected $reddito = [
+		0 => [15 => 0, 30 => 0],
+		1 => [15 => 15, 30 => 25],
+		2 => [15 => 25, 30 => 45],
+		3 => [15 => 30, 30 => 55],
+	];
+
+	/**
+	 * Configure the command line interface arguments
+	 */
 	protected function configure()
 	{
 		$this
@@ -53,6 +63,12 @@ class Console extends Command
 				'Riempie la tabella dei piatti'
 			)
 			->addOption(
+				'menu',
+				null, // 30
+				InputOption::VALUE_OPTIONAL,
+				'Riempie la tabella dei menu'
+			)
+			->addOption(
 				'scuole',
 				null, // 50
 				InputOption::VALUE_OPTIONAL,
@@ -67,6 +83,14 @@ class Console extends Command
 		;
 	}
 
+	/**
+	 * Manage the command line request
+	 *
+	 * @param InputInterface  $input
+	 * @param OutputInterface $output
+	 *
+	 * @return int|null|void
+	 */
 	protected function execute(InputInterface $input, OutputInterface $output)
 	{
 		if ($input->getOption('drop') !== null)
@@ -94,6 +118,11 @@ class Console extends Command
 			$this->fakePiatti($input->getOption('piatti'));
 		}
 
+		if($input->getOption('menu') !== null)
+		{
+			$this->fakeMenu($input->getOption('menu'));
+		}
+
 		if($input->getOption('scuole') !== null)
 		{
 			$this->fakeScuole($input->getOption('scuole'));
@@ -106,16 +135,18 @@ class Console extends Command
 	}
 
 	/**
+	 * Returns a PDO connection and creates it in case it's not already generated
+	 * Uses the connection data found in config.php to connect
 	 *
 	 * @return \PDO
 	 * @throws \Exception|\PDOException
 	 */
 	protected function getConnection()
 	{
-		$conn_data = include __DIR__.'/../config.php';
-
 		if ($this->conn == null)
 		{
+			$conn_data = include __DIR__.'/../config.php';
+
 			try
 			{
 				$this->conn = new \PDO(
@@ -135,20 +166,23 @@ class Console extends Command
 		return $this->conn;
 	}
 
-
-
+	/**
+	 * Drops all the tables and domains from the schema
+	 */
 	protected function dropSchema()
 	{
 		$conn = $this->getConnection();
 		$tables = [
+			'ricarica',
 			'presenza',
+			'persona_ingrediente',
 			'persona',
 			'scuola',
 			'piatto_ingrediente',
+			'menu',
 			'piatto',
 			'ingrediente',
 			'fornitore',
-			'menu',
 		];
 
 		foreach ($tables as $table)
@@ -156,10 +190,14 @@ class Console extends Command
 			$conn->query('DROP TABLE IF EXISTS '.$table);
 		}
 
-		$conn->query('DROP DOMAIN PARTITA_IVA');
-		$conn->query('DROP DOMAIN CODICE_FISCALE');
+		$conn->query('DROP DOMAIN IF EXISTS PARTITA_IVA');
+		$conn->query('DROP DOMAIN IF EXISTS CODICE_FISCALE');
+		$conn->query('DROP TYPE IF EXISTS tipo_piatto');
 	}
 
+	/**
+	 * Creates all the tables and domains for the schema
+	 */
 	protected function createSchema()
 	{
 		$conn = $this->getConnection();
@@ -170,6 +208,9 @@ class Console extends Command
 		$conn->query('
 			CREATE DOMAIN CODICE_FISCALE AS VARCHAR(16)
 		');
+		$conn->query("
+			CREATE TYPE tipo_piatto AS ENUM ('primo', 'secondo', 'contorno')
+		");
 
 		$conn->query('
 			CREATE TABLE fornitore (
@@ -188,6 +229,7 @@ class Console extends Command
 			CREATE TABLE piatto (
 				id SERIAL,
 				nome VARCHAR(128),
+				tipo tipo_piatto NOT NULL,
 				fornitore_partita_iva PARTITA_IVA NOT NULL,
 
 				PRIMARY KEY (id),
@@ -220,6 +262,17 @@ class Console extends Command
 		');
 
 		$conn->query('
+			CREATE TABLE menu (
+				piatto_id INTEGER NOT NULL,
+				data DATE NOT NULL,
+
+				PRIMARY KEY (piatto_id, data),
+
+				FOREIGN KEY (piatto_id) REFERENCES piatto(id)
+			)
+		');
+
+		$conn->query('
 			CREATE TABLE scuola (
 				id SERIAL,
 				circoscrizione INTEGER NOT NULL,
@@ -244,6 +297,7 @@ class Console extends Command
 				citta VARCHAR(64) NOT NULL,
 				telefono VARCHAR(32) NOT NULL,
 				scuola_id INTEGER NOT NULL,
+				classe_reddito INTEGER,
 
 				PRIMARY KEY (cf),
 
@@ -269,6 +323,20 @@ class Console extends Command
 				data DATE NOT NULL,
 
 				PRIMARY KEY (cf, data),
+
+				FOREIGN KEY (cf) REFERENCES persona(cf)
+			)
+		');
+
+		$conn->query('
+			CREATE TABLE ricarica (
+				id SERIAL,
+				cf CODICE_FISCALE NOT NULL,
+				importo FLOAT NOT NULL,
+				pasti INTEGER NOT NULL,
+				data DATE NOT NULL,
+
+				PRIMARY KEY (id),
 
 				FOREIGN KEY (cf) REFERENCES persona(cf)
 			)
@@ -345,8 +413,8 @@ class Console extends Command
 
 		$sth = $conn->prepare('
 			INSERT INTO piatto
-			(nome, fornitore_partita_iva)
-			VALUES (?, ?)
+			(nome, tipo, fornitore_partita_iva)
+			VALUES (?, ?, ?)
 		');
 
 		$sth_ingrediente = $conn->prepare('
@@ -355,10 +423,13 @@ class Console extends Command
 			VALUES (?, ?, ?)
 		');
 
+		$tipi_piatto = ['primo', 'secondo', 'contorno'];
+
 		for ($i = 0; $i < $cycles; $i++)
 		{
 			$sth->execute([
 				implode(' ', $faker->words(rand(1, 3))),
+				$tipi_piatto[array_rand($tipi_piatto)],
 				$partita_iva_arr[array_rand($partita_iva_arr)]
 			]);
 
@@ -366,18 +437,78 @@ class Console extends Command
 			$used_arr = [];
 			for ($j = 0; $j < rand(1, 5); $j++)
 			{
-				while (in_array($ingrediente_id = $ingrediente_arr[array_rand($ingrediente_arr)], $used_arr))
+				$ingrediente_id = $ingrediente_arr[array_rand($ingrediente_arr)];
+				while (in_array($ingrediente_id, $used_arr))
 				{
-					$used_arr[] = $ingrediente_id;
+					$ingrediente_id = $ingrediente_arr[array_rand($ingrediente_arr)];
 				}
 
 				$sth_ingrediente->execute([
 					$last_piatto_id,
 					$ingrediente_id,
-					rand(2, 1000)
+					rand(2, 1000) // quantità
 				]);
+
+				$used_arr[] = $ingrediente_id;
 			}
 		}
+		$conn->commit();
+	}
+
+	protected function fakeMenu($days = 30)
+	{
+		$conn = $this->getConnection();
+
+		$faker = \Faker\Factory::create('it_IT');
+
+		$conn->beginTransaction();
+
+		$partita_iva_arr = $conn->query('
+			SELECT partita_iva
+			FROM fornitore
+		')->fetchAll(\PDO::FETCH_COLUMN, 0);
+
+		$sth =$this->getConnection()->prepare('
+			INSERT INTO menu
+			(piatto_id, data)
+			VALUES (?, ?)
+		');
+
+		foreach ($partita_iva_arr as $partita_iva)
+		{
+			for ($j = 0; $j < 30; $j++)
+			{
+				// se è weekend
+				if (date('N', strtotime('2013-04-'.$j)) >= 6)
+				{
+					continue;
+				}
+
+				foreach (['primo', 'secondo', 'contorno'] as $tipo)
+				{
+					$piatto_id_arr = $conn->query("
+						SELECT id
+						FROM piatto
+						WHERE tipo = '".$tipo."' AND fornitore_partita_iva = ".$partita_iva."
+					")->fetchAll(\PDO::FETCH_COLUMN, 0);
+
+					$key = array_rand($piatto_id_arr);
+					$piatto = $piatto_id_arr[$key];
+					unset($piatto_id_arr[$key]);
+					$alternativa = $piatto_id_arr[array_rand($piatto_id_arr)];
+
+					foreach ([$piatto, $alternativa] as $piatto_id)
+					{
+						$sth->execute([
+							$piatto_id,
+							'2013-04-'.$j
+						]);
+					}
+				}
+			}
+
+		}
+
 		$conn->commit();
 	}
 
@@ -429,8 +560,8 @@ class Console extends Command
 
 		$sth = $conn->prepare('
 			INSERT INTO persona
-			(cf, nome, cognome, indirizzo, citta, telefono, scuola_id)
-			VALUES (?, ?, ?, ?, ?, ?, ?)
+			(cf, nome, cognome, indirizzo, citta, telefono, scuola_id, classe_reddito)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		');
 
 		$sth_presenza = $conn->prepare('
@@ -439,9 +570,16 @@ class Console extends Command
 			VALUES (?, ?)
 		');
 
+		$sth_ricarica = $conn->prepare('
+			INSERT INTO ricarica
+			(cf, importo, pasti, data)
+			VALUES (?, ?, ?, ?)
+		');
+
 		for ($i = 0; $i < $cycles; $i++)
 		{
 			$cf = $faker->bothify('??????##?##?###?');
+			$classe_reddito = rand(0,3);
 
 			$sth->execute([
 				$cf,
@@ -450,12 +588,25 @@ class Console extends Command
 				$faker->streetAddress,
 				rand(0, 10) === 0 ? $faker->city : 'Padova',
 				$faker->phoneNumber,
-				$scuola_id_arr[array_rand($scuola_id_arr)]
+				$scuola_id_arr[array_rand($scuola_id_arr)],
+				$classe_reddito,
 			]);
 
+			// simulate a month
 			for ($j = 1; $j < 30; $j++)
 			{
 				rand(0, 10) !== 0 ? $sth_presenza->execute([$cf, '2013-04-'.$j]) : false;
+
+				if ($classe_reddito !== 0 && rand(0, 15) === 0)
+				{
+					$pasti = rand(0,1) !== 0 ? 30 : 15;
+					$sth_ricarica->execute([
+						$cf,
+						$this->reddito[$classe_reddito][$pasti],
+						$pasti,
+						'2013-04-'.$j
+					]);
+				}
 			}
 		}
 

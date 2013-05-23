@@ -14,6 +14,32 @@
 			padding-top: 60px;
 			padding-bottom: 40px;
 		}
+
+		.admin-container {
+			position: relative;
+			margin: 15px 0;
+			padding: 15px 15px 10px;
+			background-color: #fff;
+			border: 1px solid #ddd;
+			-webkit-border-radius: 4px;
+			-moz-border-radius: 4px;
+			border-radius: 4px;
+		}
+
+		.admin-container-header {
+			position: relative;
+			top: -16px;
+			left: -16px;
+			padding: 3px 7px;
+			font-size: 12px;
+			font-weight: bold;
+			background-color: #f5f5f5;
+			border: 1px solid #ddd;
+			color: #9da0a4;
+			-webkit-border-radius: 4px 0 4px 0;
+			-moz-border-radius: 4px 0 4px 0;
+			border-radius: 4px 0 4px 0;
+		}
 	</style>
 	<link href="<?php echo base_url(); ?>assets/bootstrap/css/bootstrap-responsive.css" rel="stylesheet">
 
@@ -28,17 +54,51 @@
 	<div class="navbar navbar-fixed-top">
 		<div class="navbar-inner">
 			<div class="container">
-				<a class="brand" href="#">Mensa Scolastica</a>
-				<ul class="nav">
-					<li class="active"><a href="#">Home</a></li>
-					<li><a href="#">Link</a></li>
-					<li><a href="#">Link</a></li>
-				</ul>
+				<a class="brand" href="<?php echo base_url() ?>">Mensa Scolastica</a>
 			</div>
 		</div>
 	</div>
 
-	<?php echo $body; ?>
+	<div class="row">
+		<div class="span3">
+			<div class="container-fluid">
+				<div class="well">
+					<ul class="nav nav-list">
+						<li class="nav-header">Menu</li>
+						<?php
+							$nav = array(
+								'home' => 'Home',
+								'menu_del_giorno' => 'Menu del giorno'
+							);
+
+							foreach ($nav as $n)
+							{
+								
+							}
+
+						<li class="active"><a href="<?php echo base_url() ?>">Home</a></li>
+						<li><a href="<?php echo site_url('menu_del_giorno') ?>">Menu del giorno</a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+
+		<div class="span10">
+			<ul class="breadcrumb">
+				<?php echo $controller_title ?>
+				<span class="divider">/</span>
+				<?php echo $method_title ?>
+			</ul>
+
+			<?php if (isset($alert)) : ?>
+				<div class="alert"><?php echo htmlentities($alert) ?></div>
+			<?php endif; ?>
+
+			<div class="admin-container">
+				<?php echo $body; ?>
+			</div>
+		</div>
+	</div>
 
 	<script src="http://code.jquery.com/jquery.js"></script>
 	<script src="<?php echo base_url(); ?>assets/bootstrap/js/bootstrap.min.js"></script>
