@@ -21,7 +21,7 @@ class Console extends Command
 		0 => [15 => 0, 30 => 0],
 		1 => [15 => 15, 30 => 25],
 		2 => [15 => 25, 30 => 45],
-		3 => [15 => 30, 30 => 55],
+		3 => [15 => 35, 30 => 65],
 	];
 
 	/**
@@ -173,7 +173,7 @@ class Console extends Command
 	{
 		$conn = $this->getConnection();
 		$tables = [
-			'ricarica',
+			'versamento',
 			'presenza',
 			'persona_ingrediente',
 			'persona',
@@ -329,7 +329,7 @@ class Console extends Command
 		');
 
 		$conn->query('
-			CREATE TABLE ricarica (
+			CREATE TABLE versamento (
 				id SERIAL,
 				cf CODICE_FISCALE NOT NULL,
 				importo FLOAT NOT NULL,
@@ -570,8 +570,8 @@ class Console extends Command
 			VALUES (?, ?)
 		');
 
-		$sth_ricarica = $conn->prepare('
-			INSERT INTO ricarica
+		$sth_versamento = $conn->prepare('
+			INSERT INTO versamento
 			(cf, importo, pasti, data)
 			VALUES (?, ?, ?, ?)
 		');
@@ -600,7 +600,7 @@ class Console extends Command
 				if ($classe_reddito !== 0 && rand(0, 15) === 0)
 				{
 					$pasti = rand(0,1) !== 0 ? 30 : 15;
-					$sth_ricarica->execute([
+					$sth_versamento->execute([
 						$cf,
 						$this->reddito[$classe_reddito][$pasti],
 						$pasti,

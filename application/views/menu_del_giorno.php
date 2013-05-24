@@ -23,3 +23,5 @@
 			<?php endforeach; ?>
 	</tbody>
 </table>
+<br>
+<a href="<?php echo site_url('menu_del_giorno')?>" class="btn btn-success">Indietro</a>

@@ -71,13 +71,13 @@
 								'menu_del_giorno' => 'Menu del giorno'
 							);
 
-							foreach ($nav as $n)
+							foreach ($nav as $k => $n)
 							{
-								
+								echo $current == $k ? '<li class="active">' : '<li>';
+								echo '<a href="'.($k == 'home' ? base_url() : site_url($k)).'">'.$n.'</a>';
+								echo '</li>';
 							}
-
-						<li class="active"><a href="<?php echo base_url() ?>">Home</a></li>
-						<li><a href="<?php echo site_url('menu_del_giorno') ?>">Menu del giorno</a></li>
+						?>
 					</ul>
 				</div>
 			</div>
