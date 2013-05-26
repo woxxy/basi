@@ -147,6 +147,3 @@ class Basi extends CI_Controller {
 		$this->load->view('default', $this->data);
 	}
 }
-
-/* End of file welcome.php */
-/* Location: ./application/controllers/welcome.php */

@@ -75,10 +75,10 @@ class Console extends Command
 				'Riempie la tabella database delle scuole'
 			)
 			->addOption(
-				'persone',
+				'clienti',
 				null, // 20000
 				InputOption::VALUE_OPTIONAL,
-				'Riempie la tabella database delle persone'
+				'Riempie la tabella database delle clienti'
 			)
 		;
 	}
@@ -128,9 +128,9 @@ class Console extends Command
 			$this->fakeScuole($input->getOption('scuole'));
 		}
 
-		if($input->getOption('persone') !== null)
+		if($input->getOption('clienti') !== null)
 		{
-			$this->fakePersone($input->getOption('persone'));
+			$this->fakeclienti($input->getOption('clienti'));
 		}
 	}
 
@@ -175,8 +175,8 @@ class Console extends Command
 		$tables = [
 			'versamento',
 			'presenza',
-			'persona_ingrediente',
-			'persona',
+			'cliente_ingrediente',
+			'cliente',
 			'scuola',
 			'piatto_ingrediente',
 			'menu',
@@ -190,9 +190,9 @@ class Console extends Command
 			$conn->query('DROP TABLE IF EXISTS '.$table);
 		}
 
-		$conn->query('DROP DOMAIN IF EXISTS PARTITA_IVA');
-		$conn->query('DROP DOMAIN IF EXISTS CODICE_FISCALE');
-		$conn->query('DROP TYPE IF EXISTS tipo_piatto');
+		$conn->query('DROP DOMAIN IF EXISTS partita_iva');
+		$conn->query('DROP DOMAIN IF EXISTS codice_fiscale');
+		$conn->query('DROP TYPE IF EXISTS portata');
 	}
 
 	/**
@@ -203,23 +203,23 @@ class Console extends Command
 		$conn = $this->getConnection();
 
 		$conn->query('
-			CREATE DOMAIN PARTITA_IVA AS NUMERIC(15,0)
+			CREATE DOMAIN partita_iva AS numeric(15,0)
 		');
 		$conn->query('
-			CREATE DOMAIN CODICE_FISCALE AS VARCHAR(16)
+			CREATE DOMAIN codice_fiscale AS varchar(16)
 		');
 		$conn->query("
-			CREATE TYPE tipo_piatto AS ENUM ('primo', 'secondo', 'contorno')
+			CREATE TYPE portata AS enum ('primo', 'secondo', 'contorno')
 		");
 
 		$conn->query('
 			CREATE TABLE fornitore (
-				partita_iva PARTITA_IVA NOT NULL,
-				nome VARCHAR(256) NOT NULL,
-				indirizzo VARCHAR(128) NOT NULL,
-				citta VARCHAR(64) NOT NULL,
-				telefono VARCHAR(32) NOT NULL,
-				email VARCHAR(64) NOT NULL,
+				partita_iva partita_iva NOT NULL,
+				nome varchar(256) NOT NULL,
+				indirizzo varchar(128) NOT NULL,
+				citta varchar(64) NOT NULL,
+				telefono varchar(32) NOT NULL,
+				email varchar(64) NOT NULL,
 
 				PRIMARY KEY (partita_iva)
 			);
@@ -227,21 +227,22 @@ class Console extends Command
 
 		$conn->query('
 			CREATE TABLE piatto (
-				id SERIAL,
-				nome VARCHAR(128),
-				tipo tipo_piatto NOT NULL,
-				fornitore_partita_iva PARTITA_IVA NOT NULL,
+				id serial,
+				nome varchar(128),
+				portata portata NOT NULL,
+				fornitore_partita_iva partita_iva NOT NULL,
 
 				PRIMARY KEY (id),
 
 				FOREIGN KEY (fornitore_partita_iva) REFERENCES fornitore(partita_iva)
+					ON DELETE CASCADE
 			)
 		');
 
 		$conn->query('
 			CREATE TABLE ingrediente (
-				id SERIAL,
-				nome VARCHAR(128),
+				id serial,
+				nome varchar(128),
 
 				PRIMARY KEY (id)
 			)
@@ -249,96 +250,110 @@ class Console extends Command
 
 		$conn->query('
 			CREATE TABLE piatto_ingrediente (
-				piatto_id INTEGER,
-				ingrediente_id INTEGER,
-				quantita INTEGER,
+				piatto_id integer NOT NULL,
+				ingrediente_id integer NOT NULL,
+				quantita integer NOT NULL,
 
 
 				PRIMARY KEY (piatto_id, ingrediente_id),
 
-				FOREIGN KEY (piatto_id) REFERENCES piatto(id),
+				FOREIGN KEY (piatto_id) REFERENCES piatto(id)
+					ON DELETE CASCADE,
 				FOREIGN KEY (ingrediente_id) REFERENCES ingrediente(id)
+					ON DELETE CASCADE
 			)
 		');
 
 		$conn->query('
 			CREATE TABLE menu (
-				piatto_id INTEGER NOT NULL,
-				data DATE NOT NULL,
+				piatto_id integer NOT NULL,
+				fornitore_partita_iva partita_iva NOT NULL,
+				data date NOT NULL,
 
-				PRIMARY KEY (piatto_id, data),
+				PRIMARY KEY (piatto_id, fornitore_partita_iva, data),
 
 				FOREIGN KEY (piatto_id) REFERENCES piatto(id)
+					ON DELETE CASCADE,
+				FOREIGN KEY (fornitore_partita_iva) REFERENCES fornitore(partita_iva)
+					ON DELETE CASCADE
 			)
 		');
 
 		$conn->query('
 			CREATE TABLE scuola (
-				id SERIAL,
-				circoscrizione INTEGER NOT NULL,
-				nome VARCHAR(128) NOT NULL,
-				indirizzo VARCHAR(128) NOT NULL,
-				telefono VARCHAR(32) NOT NULL,
-				fornitore_partita_iva PARTITA_IVA NOT NULL,
+				id serial,
+				circoscrizione integer NOT NULL,
+				nome varchar(128) NOT NULL,
+				indirizzo varchar(128) NOT NULL,
+				telefono varchar(32) NOT NULL,
+				fornitore_partita_iva partita_iva NOT NULL,
 
 				PRIMARY KEY (circoscrizione, nome),
 				UNIQUE (id),
 
 				FOREIGN KEY (fornitore_partita_iva) REFERENCES fornitore(partita_iva)
+					ON DELETE RESTRICT
 			)
 		');
 
 		$conn->query('
-			CREATE TABLE persona (
-				cf CODICE_FISCALE NOT NULL,
-				nome VARCHAR(32) NOT NULL,
-				cognome VARCHAR(32) NOT NULL,
-				indirizzo VARCHAR(128) NOT NULL,
-				citta VARCHAR(64) NOT NULL,
-				telefono VARCHAR(32) NOT NULL,
-				scuola_id INTEGER NOT NULL,
-				classe_reddito INTEGER,
+			CREATE TABLE cliente (
+				cf codice_fiscale NOT NULL,
+				nome varchar(32) NOT NULL,
+				cognome varchar(32) NOT NULL,
+				indirizzo varchar(128) NOT NULL,
+				citta varchar(64) NOT NULL,
+				telefono varchar(32) NOT NULL,
+				scuola_id integer NOT NULL,
+				classe_reddito integer,
+				presenze integer NOT NULL,
+				pasti integer NOT NULL,
 
 				PRIMARY KEY (cf),
 
 				FOREIGN KEY (scuola_id) REFERENCES scuola(id)
+					ON DELETE RESTRICT
 			)
 		');
 
 		$conn->query('
-			CREATE TABLE persona_ingrediente (
-				cf CODICE_FISCALE NOT NULL,
-				ingrediente_id INTEGER NOT NULL,
+			CREATE TABLE cliente_ingrediente (
+				cf codice_fiscale NOT NULL,
+				ingrediente_id integer NOT NULL,
 
 				PRIMARY KEY (cf, ingrediente_id),
 
-				FOREIGN KEY (cf) REFERENCES persona(cf),
+				FOREIGN KEY (cf) REFERENCES cliente(cf)
+					ON DELETE CASCADE,
 				FOREIGN KEY (ingrediente_id) REFERENCES ingrediente(id)
+					ON DELETE CASCADE
 			)
 		');
 
 		$conn->query('
 			CREATE TABLE presenza (
-				cf CODICE_FISCALE NOT NULL,
-				data DATE NOT NULL,
+				cf codice_fiscale NOT NULL,
+				data date NOT NULL,
 
 				PRIMARY KEY (cf, data),
 
-				FOREIGN KEY (cf) REFERENCES persona(cf)
+				FOREIGN KEY (cf) REFERENCES cliente(cf)
+					ON DELETE CASCADE
 			)
 		');
 
 		$conn->query('
 			CREATE TABLE versamento (
-				id SERIAL,
-				cf CODICE_FISCALE NOT NULL,
-				importo FLOAT NOT NULL,
-				pasti INTEGER NOT NULL,
-				data DATE NOT NULL,
+				id serial,
+				cf codice_fiscale NOT NULL,
+				importo float NOT NULL,
+				pasti integer NOT NULL,
+				data date NOT NULL,
 
 				PRIMARY KEY (id),
 
-				FOREIGN KEY (cf) REFERENCES persona(cf)
+				FOREIGN KEY (cf) REFERENCES cliente(cf)
+					ON DELETE CASCADE
 			)
 		');
 	}
@@ -413,7 +428,7 @@ class Console extends Command
 
 		$sth = $conn->prepare('
 			INSERT INTO piatto
-			(nome, tipo, fornitore_partita_iva)
+			(nome, portata, fornitore_partita_iva)
 			VALUES (?, ?, ?)
 		');
 
@@ -459,8 +474,6 @@ class Console extends Command
 	{
 		$conn = $this->getConnection();
 
-		$faker = \Faker\Factory::create('it_IT');
-
 		$conn->beginTransaction();
 
 		$partita_iva_arr = $conn->query('
@@ -470,8 +483,8 @@ class Console extends Command
 
 		$sth =$this->getConnection()->prepare('
 			INSERT INTO menu
-			(piatto_id, data)
-			VALUES (?, ?)
+			(piatto_id, fornitore_partita_iva, data)
+			VALUES (?, ?, ?)
 		');
 
 		foreach ($partita_iva_arr as $partita_iva)
@@ -489,7 +502,7 @@ class Console extends Command
 					$piatto_id_arr = $conn->query("
 						SELECT id
 						FROM piatto
-						WHERE tipo = '".$tipo."' AND fornitore_partita_iva = ".$partita_iva."
+						WHERE portata = '".$tipo."' AND fornitore_partita_iva = ".$partita_iva."
 					")->fetchAll(\PDO::FETCH_COLUMN, 0);
 
 					$key = array_rand($piatto_id_arr);
@@ -501,6 +514,7 @@ class Console extends Command
 					{
 						$sth->execute([
 							$piatto_id,
+							$partita_iva,
 							'2013-04-'.$j
 						]);
 					}
@@ -545,7 +559,7 @@ class Console extends Command
 		$conn->commit();
 	}
 
-	protected function fakePersone($cycles = 2000)
+	protected function fakeclienti($cycles = 2000)
 	{
 		$conn = $this->getConnection();
 
@@ -559,9 +573,9 @@ class Console extends Command
 		')->fetchAll(\PDO::FETCH_COLUMN, 0);
 
 		$sth = $conn->prepare('
-			INSERT INTO persona
-			(cf, nome, cognome, indirizzo, citta, telefono, scuola_id, classe_reddito)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			INSERT INTO cliente
+			(cf, nome, cognome, indirizzo, citta, telefono, scuola_id, classe_reddito, presenze, pasti)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		');
 
 		$sth_presenza = $conn->prepare('
@@ -576,10 +590,28 @@ class Console extends Command
 			VALUES (?, ?, ?, ?)
 		');
 
+		$sth_update_presenza = $conn->prepare('
+			UPDATE cliente
+			SET presenze = presenze + 1
+			WHERE cf = ?
+		');
+
+		$sth_update_pasto = $conn->prepare('
+			UPDATE cliente
+			SET pasti = pasti + ?
+			WHERE cf = ?
+		');
+
 		for ($i = 0; $i < $cycles; $i++)
 		{
 			$cf = $faker->bothify('??????##?##?###?');
 			$classe_reddito = rand(0,3);
+
+			// make some teachers
+			if (rand(0,20) === 0)
+			{
+				$classe_reddito = null;
+			}
 
 			$sth->execute([
 				$cf,
@@ -590,14 +622,21 @@ class Console extends Command
 				$faker->phoneNumber,
 				$scuola_id_arr[array_rand($scuola_id_arr)],
 				$classe_reddito,
+				0,
+				0
 			]);
 
 			// simulate a month
 			for ($j = 1; $j < 30; $j++)
 			{
-				rand(0, 10) !== 0 ? $sth_presenza->execute([$cf, '2013-04-'.$j]) : false;
+				// one times on ten isn't present
+				if (rand(0, 10) !== 0)
+				{
+					$sth_presenza->execute([$cf, '2013-04-'.$j]);
+					$sth_update_presenza->execute([$cf]);
+				}
 
-				if ($classe_reddito !== 0 && rand(0, 15) === 0)
+				if ($classe_reddito !== 0 && rand(0, 10) === 0)
 				{
 					$pasti = rand(0,1) !== 0 ? 30 : 15;
 					$sth_versamento->execute([
@@ -606,6 +645,8 @@ class Console extends Command
 						$pasti,
 						'2013-04-'.$j
 					]);
+
+					$sth_update_pasto->execute([$pasti, $cf]);
 				}
 			}
 		}
