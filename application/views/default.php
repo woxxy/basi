@@ -88,7 +88,7 @@
 			</div>
 		</div>
 
-		<div class="span10">
+		<div class="span9">
 			<ul class="breadcrumb">
 				<?php echo $controller_title ?>
 				<span class="divider">/</span>

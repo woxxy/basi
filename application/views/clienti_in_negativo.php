@@ -1,5 +1,3 @@
-<h2>Clienti in negativo</h2>
-
 <table class="table table-striped table-bordered">
 	<thead>
 		<th>Codice Fiscale</th>

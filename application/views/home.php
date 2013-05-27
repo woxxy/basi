@@ -1,5 +1,5 @@
 <div class="hero-unit">
-	<h1>Gestione della<br>Mensa Scolastica</h1>
+	<h1>Gestione della Mensa<br>della Scuola Primaria Comunale</h1>
 	<p>Progetto di Basi di Dati</p>
 	<br/>
 	<p>
