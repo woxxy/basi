@@ -72,7 +72,8 @@
 								'generale' => 'Generale',
 								'menu_del_giorno' => 'Menu del giorno',
 								'clienti_in_negativo' => 'Clienti in negativo',
-								'clienti_per_fornitore' => 'Clienti per fornitore'
+								'clienti_per_fornitore' => 'Clienti per fornitore',
+								'piatti_offerti_frequentemente' => 'Piatti offerti frequentemente'
 							);
 
 							foreach ($nav as $k => $n)

@@ -109,14 +109,14 @@ class Basi extends CI_Controller {
 
 		if ($get = $this->input->get())
 		{
-			if (isset($get['nome_scuola']) && isset($get['circoscrizione_scuola']))
+			if (isset($get['nome_scuola']) && isset($get['circoscrizione_scuola']) && ctype_digit($get['circoscrizione_scuola']))
 			{
 				$sth = $this->_getConn()->prepare("
 					SELECT p.nome, p.portata
 					FROM menu AS m
 					JOIN piatto AS p ON m.piatto_id = p.id
 					JOIN scuola AS s ON p.fornitore_partita_iva = s.fornitore_partita_iva
-					WHERE m.data = '2013-04-02'
+					WHERE m.data = '2013-04-22'
 						AND s.nome = ?
 						AND s.circoscrizione = ?
 				");
@@ -127,16 +127,15 @@ class Basi extends CI_Controller {
 				if ($data['piatti'])
 				{
 					$data['scuola'] = $get['nome_scuola'];
-					$data['giorno'] = '2013-04-28';
+					$data['giorno'] = '2013-04-22';
 					$data['circoscrizione'] = $get['circoscrizione_scuola'];
 					$this->data['body'] = $this->load->view('menu_del_giorno', $data, true);
 					$this->load->view('default', $this->data);
 					return;
 				}
-
-				$this->data['alert'] = 'La scuola richiesta non esiste.';
 			}
 
+			$this->data['alert'] = 'La scuola richiesta non esiste.';
 		}
 
 		$data['scuole'] = $this->_getConn()->query('SELECT * FROM scuola')->fetchAll();
@@ -157,7 +156,7 @@ class Basi extends CI_Controller {
 				$sth = $this->_getConn()->prepare("
 					SELECT p.nome AS piatto_nome, i.nome AS ingrediente_nome
 					FROM piatto AS m
-					WHERE m.data = '2013-04-02'
+					WHERE m.data = '2013-04-22'
 						AND s.nome = ?
 						AND s.circoscrizione = ?
 				");
@@ -168,7 +167,7 @@ class Basi extends CI_Controller {
 				if ($data['piatti'])
 				{
 					$data['scuola'] = $get['nome_scuola'];
-					$data['giorno'] = '2013-04-02';
+					$data['giorno'] = '2013-04-22';
 					$data['circoscrizione'] = $get['circoscrizione_scuola'];
 					$this->data['body'] = $this->load->view('menu_del_giorno', $data, true);
 					$this->load->view('default', $this->data);
@@ -205,12 +204,12 @@ class Basi extends CI_Controller {
 
 	public function clienti_per_fornitore()
 	{
-		$this->data['method_title'] = 'Clienti Presenti per FOrnitore';
+		$this->data['method_title'] = 'Clienti Presenti per Fornitore';
 		$this->data['current'] = 'clienti_per_fornitore';
 
 		if ($get = $this->input->get())
 		{
-			if (isset($get['partita_iva']))
+			if (isset($get['partita_iva']) && ctype_digit($get['partita_iva']))
 			{
 				$sth_fornitore = $this->_getConn()->prepare('SELECT * FROM fornitore WHERE partita_iva = ?');
 				$sth_fornitore->execute(array($get['partita_iva']));
@@ -238,22 +237,65 @@ class Basi extends CI_Controller {
 						WHERE f.partita_iva = ?
 							AND pr.data = ?
 					');
+
+					$sth->execute(array($get['partita_iva'], '2013-04-22'));
+					$sth_allergici->execute(array($get['partita_iva'], '2013-04-22'));
+					$data['result'] = $sth->fetchAll();
+					$data['result_allergici'] = $sth_allergici->fetchAll();
+
+					$this->data['body'] = $this->load->view('clienti_per_fornitore', $data, true);
+					$this->load->view('default', $this->data);
+					return;
 				}
-
-				$sth->execute(array($get['partita_iva'], '2013-04-22'));
-				$sth_allergici->execute(array($get['partita_iva'], '2013-04-22'));
-				$data['result'] = $sth->fetchAll();
-				$data['result_allergici'] = $sth_allergici->fetchAll();
-
-				$this->data['body'] = $this->load->view('clienti_per_fornitore', $data, true);
-				$this->load->view('default', $this->data);
-				return;
 			}
+
+			$this->data['alert'] = 'Il fornitore specificato non esiste';
 		}
 
 		$data['fornitori'] = $this->_getConn()->query('SELECT * FROM fornitore')->fetchAll();
 
 		$this->data['body'] = $this->load->view('fornitori', $data, true);
+		$this->load->view('default', $this->data);
+	}
+
+	public function piatti_offerti_frequentemente()
+	{
+		$this->data['method_title'] = 'Piatti offerti frequentemente';
+		$this->data['current'] = 'piatti_offerti_frequentemente';
+
+		if ($get = $this->input->get())
+		{
+			if (isset($get['partita_iva']) && ctype_digit($get['partita_iva']))
+			{
+				$sth_fornitore = $this->_getConn()->prepare('SELECT * FROM fornitore WHERE partita_iva = ?');
+				$sth_fornitore->execute(array($get['partita_iva']));
+				if ($sth_fornitore->rowCount() > 0)
+				{
+					$data['fornitore'] = $sth_fornitore->fetch();
+
+					$sth = $this->_getConn()->prepare('
+						SELECT p.nome, COUNT(*)
+						FROM menu AS m
+						JOIN piatto AS p ON m.piatto_id = p.id
+						WHERE m.fornitore_partita_iva = ?
+						GROUP BY piatto_id, p.nome
+						ORDER BY COUNT(*) DESC
+					');
+
+					$sth->execute(array($get['partita_iva']));
+					$data['result'] = $sth->fetchAll();
+					$this->data['body'] = $this->load->view('piatti_offerti_frequentemente', $data, true);
+					$this->load->view('default', $this->data);
+					return;
+				}
+			}
+
+			$this->data['alert'] = 'Il fornitore specificato non esiste';
+		}
+
+		$data['fornitori'] = $this->_getConn()->query('SELECT * FROM fornitore')->fetchAll();
+
+		$this->data['body'] = $this->load->view('fornitori_piatti', $data, true);
 		$this->load->view('default', $this->data);
 	}
 }
