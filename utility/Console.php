@@ -95,42 +95,50 @@ class Console extends Command
 	{
 		if ($input->getOption('drop') !== null)
 		{
+			$output->writeln("Dropping schema");
 			$this->dropSchema();
 		}
 
 		if ($input->getOption('create') !== null)
 		{
+			$output->writeln("Creating schema");
 			$this->createSchema();
 		}
 
 		if($input->getOption('fornitori') !== null)
 		{
+			$output->writeln("Filling fornitori");
 			$this->fakeFornitori($input->getOption('fornitori'));
 		}
 
 		if($input->getOption('ingredienti') !== null)
 		{
+			$output->writeln("Filling ingredienti");
 			$this->fakeIngredienti($input->getOption('ingredienti'));
 		}
 
 		if($input->getOption('piatti') !== null)
 		{
+			$output->writeln("Filling piatti");
 			$this->fakePiatti($input->getOption('piatti'));
 		}
 
 		if($input->getOption('menu') !== null)
 		{
+			$output->writeln("Filling menu");
 			$this->fakeMenu($input->getOption('menu'));
 		}
 
 		if($input->getOption('scuole') !== null)
 		{
+			$output->writeln("Filling scuole");
 			$this->fakeScuole($input->getOption('scuole'));
 		}
 
 		if($input->getOption('clienti') !== null)
 		{
-			$this->fakeclienti($input->getOption('clienti'));
+			$output->writeln("Filling clienti");
+			$this->fakeClienti($input->getOption('clienti'));
 		}
 	}
 
@@ -175,10 +183,10 @@ class Console extends Command
 		$tables = [
 			'versamento',
 			'presenza',
-			'cliente_ingrediente',
+			'allergico',
 			'cliente',
 			'scuola',
-			'piatto_ingrediente',
+			'composto',
 			'menu',
 			'piatto',
 			'ingrediente',
@@ -249,7 +257,7 @@ class Console extends Command
 		');
 
 		$conn->query('
-			CREATE TABLE piatto_ingrediente (
+			CREATE TABLE composto (
 				piatto_id integer NOT NULL,
 				ingrediente_id integer NOT NULL,
 				quantita integer NOT NULL,
@@ -317,7 +325,7 @@ class Console extends Command
 		');
 
 		$conn->query('
-			CREATE TABLE cliente_ingrediente (
+			CREATE TABLE allergico (
 				cf codice_fiscale NOT NULL,
 				ingrediente_id integer NOT NULL,
 
@@ -433,7 +441,7 @@ class Console extends Command
 		');
 
 		$sth_ingrediente = $conn->prepare('
-			INSERT INTO piatto_ingrediente
+			INSERT INTO composto
 			(piatto_id, ingrediente_id, quantita)
 			VALUES (?, ?, ?)
 		');
@@ -559,23 +567,32 @@ class Console extends Command
 		$conn->commit();
 	}
 
-	protected function fakeclienti($cycles = 2000)
+	protected function fakeClienti($cycles = 2000)
 	{
 		$conn = $this->getConnection();
 
 		$faker = \Faker\Factory::create('it_IT');
-
-		$conn->beginTransaction();
 
 		$scuola_id_arr = $conn->query('
 			SELECT id
 			FROM scuola
 		')->fetchAll(\PDO::FETCH_COLUMN, 0);
 
+		$ingredienti_id_arr = $conn->query('
+			SELECT id
+			FROM ingrediente
+		')->fetchAll(\PDO::FETCH_COLUMN, 0);
+
 		$sth = $conn->prepare('
 			INSERT INTO cliente
 			(cf, nome, cognome, indirizzo, citta, telefono, scuola_id, classe_reddito, presenze, pasti)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		');
+
+		$sth_allergico = $conn->prepare('
+			INSERT INTO allergico
+			(cf, ingrediente_id)
+			VALUES (?, ?)
 		');
 
 		$sth_presenza = $conn->prepare('
@@ -604,6 +621,7 @@ class Console extends Command
 
 		for ($i = 0; $i < $cycles; $i++)
 		{
+			$conn->beginTransaction();
 			$cf = $faker->bothify('??????##?##?###?');
 			$classe_reddito = rand(0,3);
 
@@ -626,9 +644,24 @@ class Console extends Command
 				0
 			]);
 
+			// give a couple allergies to the poor guy
+			if (rand(0, 6) === 0)
+			{
+				$keys = array_rand($ingredienti_id_arr, rand(5, 20));
+				foreach ($keys as $key)
+				{
+					$sth_allergico->execute([$cf, $ingredienti_id_arr[$key]]);
+				}
+			}
+
 			// simulate a month
 			for ($j = 1; $j < 30; $j++)
 			{
+				if (date('N', strtotime('2013-04-'.$j)) >= 6)
+				{
+					continue;
+				}
+
 				// one times on ten isn't present
 				if (rand(0, 10) !== 0)
 				{
@@ -636,7 +669,7 @@ class Console extends Command
 					$sth_update_presenza->execute([$cf]);
 				}
 
-				if ($classe_reddito !== 0 && rand(0, 10) === 0)
+				if ($classe_reddito !== null && $classe_reddito !== 0 && rand(0, 10) === 0)
 				{
 					$pasti = rand(0,1) !== 0 ? 30 : 15;
 					$sth_versamento->execute([
@@ -649,8 +682,7 @@ class Console extends Command
 					$sth_update_pasto->execute([$pasti, $cf]);
 				}
 			}
+			$conn->commit();
 		}
-
-		$conn->commit();
 	}
 }

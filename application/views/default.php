@@ -55,6 +55,7 @@
 		<div class="navbar-inner">
 			<div class="container">
 				<a class="brand" href="<?php echo base_url() ?>">Mensa Scolastica</a>
+				<a class="brand pull-right" href="<?php echo base_url() ?>">2013-04-22</a>
 			</div>
 		</div>
 	</div>
@@ -68,7 +69,10 @@
 						<?php
 							$nav = array(
 								'home' => 'Home',
-								'menu_del_giorno' => 'Menu del giorno'
+								'generale' => 'Generale',
+								'menu_del_giorno' => 'Menu del giorno',
+								'clienti_in_negativo' => 'Clienti in negativo',
+								'clienti_per_fornitore' => 'Clienti per fornitore'
 							);
 
 							foreach ($nav as $k => $n)

@@ -63,6 +63,45 @@ class Basi extends CI_Controller {
 		$this->load->view('default', $this->data);
 	}
 
+	public function generale()
+	{
+		$this->data['method_title'] = 'Pannello riassuntivo';
+		$this->data['current'] = 'generale';
+
+		$tabella = array();
+		$tabella['count_clienti'] = array('Totale clienti',
+			$this->_getConn()->query('SELECT COUNT(*) FROM cliente')->fetchColumn(0));
+		$tabella['count_insegnanti'] = array('Totale insegnanti',
+			$this->_getConn()->query('SELECT COUNT(*) FROM cliente WHERE classe_reddito IS NULL')->fetchColumn(0));
+		$tabella['count_studenti'] = array('Totale studenti',
+			$this->_getConn()->query('SELECT COUNT(*) FROM cliente WHERE classe_reddito IS NOT NULL')->fetchColumn(0));
+		$tabella['count_paganti'] = array('Studenti paganti',
+			$this->_getConn()->query('SELECT COUNT(*) FROM cliente WHERE classe_reddito > 0')->fetchColumn(0));
+
+		$tabella['count_studenti_presenti'] = array('Studenti presenti', $this->_getConn()->query('
+			SELECT COUNT(*)
+			FROM presenza AS p
+			NATURAL JOIN cliente AS c
+			WHERE classe_reddito IS NOT NULL
+				AND p.data = \'2013-04-22\'
+		')->fetchColumn(0));
+
+		$tabella['count_insegnanti_presenti'] = array('Insegnanti presenti', $this->_getConn()->query('
+			SELECT COUNT(*)
+			FROM presenza AS p
+			NATURAL JOIN cliente AS c
+			WHERE classe_reddito IS NULL
+				AND p.data = \'2013-04-22\'
+		')->fetchColumn(0));
+
+		$tabella['count_fornitori'] = array('Totale fornitori',
+			$this->_getConn()->query('SELECT COUNT(*) FROM fornitore')->fetchColumn(0));
+
+		$data['tabella'] = $tabella;
+		$this->data['body'] = '<h2>Tabella riassuntiva</h2><br>'.$this->load->view('doppia_colonna', $data, true);
+		$this->load->view('default', $this->data);
+	}
+
 	public function menu_del_giorno()
 	{
 		$this->data['method_title'] = 'Menu del giorno';
@@ -73,7 +112,7 @@ class Basi extends CI_Controller {
 			if (isset($get['nome_scuola']) && isset($get['circoscrizione_scuola']))
 			{
 				$sth = $this->_getConn()->prepare("
-					SELECT p.nome, p.tipo
+					SELECT p.nome, p.portata
 					FROM menu AS m
 					JOIN piatto AS p ON m.piatto_id = p.id
 					JOIN scuola AS s ON p.fornitore_partita_iva = s.fornitore_partita_iva
@@ -88,7 +127,7 @@ class Basi extends CI_Controller {
 				if ($data['piatti'])
 				{
 					$data['scuola'] = $get['nome_scuola'];
-					$data['giorno'] = '2013-04-02';
+					$data['giorno'] = '2013-04-28';
 					$data['circoscrizione'] = $get['circoscrizione_scuola'];
 					$this->data['body'] = $this->load->view('menu_del_giorno', $data, true);
 					$this->load->view('default', $this->data);
@@ -135,15 +174,86 @@ class Basi extends CI_Controller {
 					$this->load->view('default', $this->data);
 					return;
 				}
-
-				$this->data['alert'] = 'La scuola richiesta non esiste.';
 			}
 
+			$this->data['alert'] = 'La scuola richiesta non esiste.';
 		}
 
 		$data['fornitori'] = $this->_getConn()->query('SELECT * FROM scuola')->fetchAll();
 
 		$this->data['body'] = $this->load->view('piatti_meno_offerti_query', $data, true);
+		$this->load->view('default', $this->data);
+	}
+
+	public function clienti_in_negativo()
+	{
+		$this->data['method_title'] = 'Clienti in Negativo';
+		$this->data['current'] = 'clienti_in_negativo';
+
+		$data['result'] = $this->_getConn()->query('
+			SELECT *
+			FROM cliente
+			WHERE classe_reddito > 0
+				AND pasti < presenze
+			ORDER BY (pasti - presenze)
+			LIMIT 300
+		')->fetchAll();
+
+		$this->data['body'] = $this->load->view('clienti_in_negativo', $data, true);
+		$this->load->view('default', $this->data);
+	}
+
+	public function clienti_per_fornitore()
+	{
+		$this->data['method_title'] = 'Clienti Presenti per FOrnitore';
+		$this->data['current'] = 'clienti_per_fornitore';
+
+		if ($get = $this->input->get())
+		{
+			if (isset($get['partita_iva']))
+			{
+				$sth_fornitore = $this->_getConn()->prepare('SELECT * FROM fornitore WHERE partita_iva = ?');
+				$sth_fornitore->execute(array($get['partita_iva']));
+				if ($sth_fornitore->rowCount() > 0)
+				{
+					$data['fornitore'] = $sth_fornitore->fetch();
+
+					$sth = $this->_getConn()->prepare('
+						SELECT COUNT(*)
+						FROM fornitore AS f
+						JOIN scuola AS s ON f.partita_iva = s.fornitore_partita_iva
+						JOIN cliente AS c ON s.id = c.scuola_id
+						NATURAL JOIN presenza AS pr
+						WHERE f.partita_iva = ?
+							AND pr.data = ?
+					');
+
+					$sth_allergici = $this->_getConn()->prepare('
+						SELECT COUNT(DISTINCT(a.cf))
+						FROM fornitore AS f
+						JOIN scuola AS s ON f.partita_iva = s.fornitore_partita_iva
+						JOIN cliente AS c ON s.id = c.scuola_id
+						NATURAL JOIN presenza AS pr
+						NATURAL JOIN allergico AS a
+						WHERE f.partita_iva = ?
+							AND pr.data = ?
+					');
+				}
+
+				$sth->execute(array($get['partita_iva'], '2013-04-22'));
+				$sth_allergici->execute(array($get['partita_iva'], '2013-04-22'));
+				$data['result'] = $sth->fetchAll();
+				$data['result_allergici'] = $sth_allergici->fetchAll();
+
+				$this->data['body'] = $this->load->view('clienti_per_fornitore', $data, true);
+				$this->load->view('default', $this->data);
+				return;
+			}
+		}
+
+		$data['fornitori'] = $this->_getConn()->query('SELECT * FROM fornitore')->fetchAll();
+
+		$this->data['body'] = $this->load->view('fornitori', $data, true);
 		$this->load->view('default', $this->data);
 	}
 }

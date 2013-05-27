@@ -10,14 +10,14 @@
 			$menu = array();
 			foreach ($piatti as $piatto)
 			{
-				$menu[$piatto['tipo']][] = $piatto;
+				$menu[$piatto['portata']][] = $piatto;
 			}
 
 			foreach (array('primo', 'secondo', 'contorno') as $portata):
 				foreach ($menu[$portata] as $p) : ?>
 			<tr>
 				<td><?php echo $p['nome'] ?></td>
-				<td><?php echo $p['tipo'] ?></td>
+				<td><?php echo $p['portata'] ?></td>
 			</tr>
 				<?php endforeach; ?>
 			<?php endforeach; ?>
