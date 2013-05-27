@@ -94,6 +94,30 @@ class Basi extends CI_Controller {
 				AND p.data = \'2013-04-22\'
 		')->fetchColumn(0));
 
+		$tabella['media_studenti_per_scuola'] = array('Media studenti per scuola', floor($this->_getConn()->query('
+			SELECT AVG(count)
+			FROM
+			(
+				SELECT COUNT(*) as count
+				FROM cliente AS c
+				JOIN scuola AS s ON s.id = c.scuola_id
+				WHERE classe_reddito IS NOT NULL
+				GROUP BY s.id
+			) AS x
+		')->fetchColumn(0)));
+
+		$tabella['media_insegnanti_per_scuola'] = array('Media insegnanti per scuola', floor($this->_getConn()->query('
+			SELECT AVG(count)
+			FROM
+			(
+				SELECT COUNT(*) as count
+				FROM cliente AS c
+				JOIN scuola AS s ON s.id = c.scuola_id
+				WHERE classe_reddito IS NULL
+				GROUP BY s.id
+			) AS x
+		')->fetchColumn(0)));
+
 		$tabella['count_fornitori'] = array('Totale fornitori',
 			$this->_getConn()->query('SELECT COUNT(*) FROM fornitore')->fetchColumn(0));
 
